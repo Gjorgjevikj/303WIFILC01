@@ -67,23 +67,6 @@ void setup() {
       ota_on = false;
   }
 
-/*  delay(1000);
-  for (int i = 5; i > 0; i--)
-  {
-      Serial.printf("%d...",i);
-      delay(1000);
-  }*/
-  //Serial.printf("\nGO!");
-
-/// === test =========================================================
-/*  Serial.println();
-  for (int i = 0; i <= 8; i++)
-  {
-      Serial.printf("%d .%s.\n", i, progress2disp(i));
-  }
-  Serial.println();*/
-  /// === test =========================================================
-
   Serial.printf("\n\n");
   Serial.printf("main: Welcome to nCLC, a basic NTP clock version %s\n",VERSION);
 

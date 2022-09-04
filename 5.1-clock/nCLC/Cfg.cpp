@@ -295,11 +295,3 @@ void Cfg::_handle_404(void) {
   _websrv->send(404,"text/html",head(_appname)+body1(_appname,"Error")+body+body2());
 }
 
-/*
-void Cfg::_handle_favicon(void)
-{
-    LOGUSR("web: '%s' served\n", _websrv->uri().c_str());
-    String dta = "data:image/x-icon;base64,AAABAAEAAQEAAAEAIAAwAAAAFgAAACgAAAABAAAAAgAAAAEAIAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//AAAAAA==";
-    _websrv->send(200, "image/x-icon", dta.c_str());
-}
-*/
