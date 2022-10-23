@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include "disp.h"
 
+/*
 // A font, optimized for readability, for a 7 segment display.
 // Support characters 0..127 (but first 32 are empty).
 static const uint8_t disp_font[0x80] = {
@@ -115,6 +116,7 @@ static const uint8_t disp_font[0x80] = {
 };
 
 
+
 // The 303WIFILC01 board does not connect pin X of the TM1650 to pin X of the 4x7 segment display.
 // The DIG1, DIG2, DIG3, and DIG4 or 1-1, so are segments C, D, E, but the other segments are mixed.
 //   to light segment power pin
@@ -212,17 +214,23 @@ void disp_init() {
 
 // Puts (first 4 chars of) `s` (padded with spaces) on display, using flags in `dots` for P
 void disp_show(const char * s, uint8_t dots) {
-  for(int i=0; i<4; i++ ) {
+  for(int i=0; *s && i<4; i++, s++ ) {
     // Lookup for char *s which segments to enable. *s is truncated to 7 bits, bit 8 is for P
-    uint8_t segments1 = (disp_font[*s & 0x7F]) | ( *s & 0x80 );
-    if( dots & (1<<i) ) segments1 |= 0x80; // Add dot to segments
+    //uint8_t segments1 = (disp_font[*s & 0x7F]) | ( *s & 0x80 );
+      uint8_t segments1 = (dispFont[*s & 0x7F]); // | (*s & 0x80);
+      if (dots & (1 << i)) segments1 |= SEG_P; // Add dot to segments
+    //if( dots & (1<<i) ) segments1 |= 0x80; // Add dot to segments
     // TM1650 is not wired 1-1 to display, so remap segments
-    uint8_t segments2= disp_segremap[segments1];
+    //uint8_t segments2= disp_segremap[segments1];
+    uint8_t segments2 = segments1;
     // Send to display
-    Wire.beginTransmission(0x34+i);
-    Wire.write(segments2);
-    Wire.endTransmission();
-    if( *s ) s++; // next char unless at end  
+    //Wire.beginTransmission(0x34+i);
+    //Wire.write(segments2);
+    //Wire.endTransmission();
+
+    disp_set(i, segments2);
+
+    // if( *s ) s++; // next char unless at end  
   }
 }
 
@@ -233,4 +241,87 @@ void disp_set(int d, uint8_t segs)
     Wire.beginTransmission(0x34 + d);
     Wire.write(segs);
     Wire.endTransmission();
+}
+*/
+
+//////////////////////////////////////////////////////////////////////////////////////
+
+
+disp303::disp303(int b, bool m, bool p) : disp_brightness(b), disp_mode(m), disp_power(p)
+{
+    //init();
+}
+
+void disp303::init()
+{
+    Wire.begin(SDA_PIN, SCL_PIN);
+    int res = write(0x24, ((disp_brightness & 0b111) << 4) | (disp_mode << 3) | disp_power);
+    if (res == 0) Serial.printf("disp: init\n");
+    else Serial.printf("disp: init ERROR %d\n", res);
+}
+
+void disp303::setBrightness(uint8_t brightness)
+{
+    if (brightness < 1) brightness = 1;
+    if (brightness > 8) brightness = 8;
+    disp_brightness = brightness;
+    init();
+}
+
+uint8_t disp303::getBrightness() const
+{
+    return disp_brightness;
+}
+
+void inline disp303::increaseBrightness()
+{
+    if (disp_brightness < 8)
+        disp_brightness++;
+    //disp_brightness%=8;
+    init();
+}
+
+void inline disp303::decreaseBrightness()
+{
+    if (disp_brightness > 0)
+        disp_brightness--;
+    init();
+}
+
+void disp303::setPower(bool power) {
+    disp_power = power;
+    init();
+}
+
+bool disp303::getPower() const
+{
+    return disp_power;
+}
+
+void disp303::show(const char* s, uint8_t dots)
+{
+    for (uint8_t i = 0; *s && i < 4; i++, s++)
+    {
+        // Lookup for char *s which segments to enable. *s is truncated to 7 bits
+        uint8_t segments = (dispFont[*s & 0x7F]);
+        if (dots & (1 << i)) 
+            segments |= SEG_P; // Add dot to segments
+        setDigit(i, segments);
+    }
+}
+
+IRAM_ATTR void disp303::setDigit(uint8_t d, uint8_t segs)
+{
+    // Send to display
+    write(0x34 + d, segs);
+    //Wire.beginTransmission(0x34 + d);
+    //Wire.write(segs);
+    //Wire.endTransmission();
+}
+
+IRAM_ATTR uint8_t disp303::write(uint8_t reg, uint8_t val)
+{
+    Wire.beginTransmission(reg);
+    Wire.write(val);
+    return Wire.endTransmission();
 }
