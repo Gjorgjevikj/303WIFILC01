@@ -11,11 +11,13 @@
 #include "disp.h"
 #include "wifi.h"
 
+#include <Ticker.h>
+
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #define OTA_PASSWORD "IoTOTA"
-#define OTA_TIMEOUT 300000
+#define OTA_TIMEOUT 100000
 
 NvmField cfg_fields[] = {
   {"Access points"   , ""                           ,  0, "The clock uses internet to get time. Supply credentials for one or more WiFi access points (APs). " },
@@ -56,6 +58,19 @@ const char * render_months=" 1 2 3 4 5 6 7 8 9101112";
 bool ota_on = true;
 bool sync = false;
 
+Ticker dispTick;
+bool animRunning;
+
+void dispNextFrame()
+{
+    static int frame = 0;
+    static const uint8_t ani[] = { SEG_A, SEG_B, SEG_C, SEG_D, SEG_E, SEG_F, 0 };
+
+    disp_set(3, ani[frame++]);
+    if (!ani[frame])
+        frame = 0;
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(BUT2_PIN, INPUT_PULLUP);
@@ -95,6 +110,9 @@ void setup() {
 
   // Preprocess config for rendering
   disp_show("NtP");
+  dispTick.attach_ms(250, dispNextFrame);
+  animRunning = true;
+
   if( cfg.getval("hours")[0]=='1' && cfg.getval("hours")[1]=='2' ) render_hours_len=12; else render_hours_len=24;
   if( cfg.getval("hours")[2]=='a' ) render_hours_flag = RENDER_FLAG_AM;
   else if( cfg.getval("hours")[2]=='p' ) render_hours_flag = RENDER_FLAG_PM;
@@ -103,6 +121,8 @@ void setup() {
   render_dayfirst = cfg.getval("dateorder")[0]!='m';
   if( strlen(cfg.getval("monthnames"))==24 ) render_months=cfg.getval("monthnames");
   Serial.printf("rend: date %s, names '%s'\n",render_dayfirst?"day:month":"month:day",render_months);
+
+  //disp_set(3, SEG_B | SEG_G | SEG_E);
 
   // WiFi and NTP
   wifi_init(cfg.getval("Ssid.1"),cfg.getval("Password.1"), cfg.getval("Ssid.2"),cfg.getval("Password.2"), cfg.getval("Ssid.3"),cfg.getval("Password.3"));
@@ -241,6 +261,12 @@ void loop()
       char bnow[5];
       int dots = DISP_DOTNO;
 
+      if (animRunning)
+      {
+          dispTick.detach();
+          animRunning = false;
+      }
+
       if (show_date)
       {
           if (render_dayfirst)
@@ -257,6 +283,7 @@ void loop()
           dots = in_sec < 500 ? DISP_DOTNO : DISP_DOTCOLON;
           if (render_hours_flag == RENDER_FLAG_AM && !pm) dots |= DISP_DOT4;
           if (render_hours_flag == RENDER_FLAG_PM && pm) dots |= DISP_DOT4;
+          // flashing the first dot while OTA is active
           if (ota_on && snow->tm_sec%5==0)
           {
               if ((in_sec < 50)
@@ -268,6 +295,10 @@ void loop()
           }
       }
       disp_show(bnow, dots);
+  }
+  else // not synced yet...
+  {
+//      disp_set(3, SEG_A | SEG_G | SEG_E);
   }
   
 }

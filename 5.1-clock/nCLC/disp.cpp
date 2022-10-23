@@ -5,7 +5,6 @@
 #include <Wire.h>
 #include "disp.h"
 
-
 // A font, optimized for readability, for a 7 segment display.
 // Support characters 0..127 (but first 32 are empty).
 static const uint8_t disp_font[0x80] = {
@@ -225,4 +224,13 @@ void disp_show(const char * s, uint8_t dots) {
     Wire.endTransmission();
     if( *s ) s++; // next char unless at end  
   }
+}
+
+// Sets raw segments on the n-th digit of the display
+void disp_set(int d, uint8_t segs) 
+{
+    // Send to display
+    Wire.beginTransmission(0x34 + d);
+    Wire.write(segs);
+    Wire.endTransmission();
 }
