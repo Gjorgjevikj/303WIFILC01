@@ -2,6 +2,27 @@
 #ifndef _DISP_H_
 #define _DISP_H_
 
+// https://datasheet.lcsc.com/lcsc/1810281208_TM-Shenzhen-Titan-Micro-Elec-TM1650_C44444.pdf
+
+/*
+Brightness settings
+MSB				LSB
+B7 B6 B5 B4 B3 B2 B1 B0 Explanation
+ ×  0  0  0     ×  ×	8 brightness
+ ×  0  0  1     ×  ×	1 brightness
+ ×  0  1  0     ×  ×	2 brightness
+ ×  0  1  1     ×  ×	3 Brightness
+ ×  1  0  0     ×  ×	4 brightness
+ ×  1  0  1     ×  ×	5 brightness
+ ×  1  1  0     ×  ×	6 brightness
+ ×  1  1  1     ×  ×	7 brightness
+On / off the display position
+MSB				LSB
+B7 B6 B5 B4 B3 B2 B1 B0 Explanation
+ ×              ×  ×  0 Off Display
+ ×              ×  ×  1 On Display
+ */
+
 // Constants for dots in disp_show()
 #define DISP_DOTNO     0
 #define DISP_DOT1      1
@@ -21,6 +42,22 @@ enum nCLCsegs : uint8_t {
     SEG_B = 0b10000000
 };
 
+// The 303WIFILC01 board does not connect pin X of the TM1650 to pin X of the 4x7 segment display.
+// The DIG1, DIG2, DIG3, and DIG4 or 1-1, so are segments C, D, E, but the other segments are mixed.
+//   to light segment power pin
+//   ---------------- ---------
+//           A            F   
+//           B            P   
+//           C            C   
+//           D            D   
+//           E            E   
+//           F            G   
+//           G            B   
+//           P            A   
+
+// https://github.com/maarten-pennings/SevenSegment-over-Serial/tree/main/font#lookalike7s
+// A font, optimized for readability, for a 7 segment display.
+// Support characters 0..127 (but first 32 are empty).
 static const uint8_t dispFont[0x80] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // padding for 0x0_
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // padding for 0x1_
@@ -128,93 +165,37 @@ static const uint8_t dispFont[0x80] = {
   0b00111110  // 7F del
 };
 
-
-void disp_brightness_set(int brightness);       // Sets brightness level 1..8
-int  disp_brightness_get();                     // Gets brightness level
-void disp_power_set(int power);                 // Sets power 0 (off) or 1 (on)
-int  disp_power_get();                          // Gets power level
-                                              
-void disp_init();                               // Initializes display (prints error to Serial)
-void disp_show(const char * s, uint8_t dots=0); // Puts (first 4 chars of) `s` (padded with spaces) on display, using flags in `dots` for P
-
-void disp_set(int d, uint8_t segs);             // Sets raw segments on the n-th digit of the display
-
-
-
-class disp303
+class Disp303
 {
 private:
-    enum disp303pins : int8_t { SCL_PIN = 12, SDA_PIN = 13 };
+    enum Disp303TM1650pins : int8_t { SCL_PIN = 12, SDA_PIN = 13 };
+    enum TM1650reg : uint8_t { 
+        TM1650_CONTROL_BASE = 0x24,	// Address of the control register of the left-most digit
+        TM1650_DISPLAY_BASE	= 0x34	// Address of the left-most digit
+    };
 public:
-    disp303(int b = 4, bool m = false, bool p = false);
-    /* : disp_brightness(b), disp_mode(m), disp_power(p)
-    {
-        init();
-    }*/
-
+    Disp303(int bright = 4, bool segmode = false, bool power = false);
     void init();
-    /* {
-        Wire.begin(SDA_PIN, SCL_PIN);
-        int res = write(0x24, ((disp_brightness & 0b111) << 4) | (disp_mode7 << 3) | disp_power);
-        if (res == 0) Serial.printf("disp: init\n");
-        else Serial.printf("disp: init ERROR %d\n", res);
-    }*/
-
     void setBrightness(uint8_t brightness);
-    /* {
-        if (brightness < 1) brightness = 1;
-        if (brightness > 8) brightness = 8;
-        disp_brightness = brightness;
-        init();
-    }*/
-
+    void setBrightness();
     uint8_t getBrightness() const;
-    /* {
-        return disp_brightness;
-    }*/
-
-    void increaseBrightness();
-    void decreaseBrightness();
-
     void setPower(bool power = true);
-    /* {
-        disp_power = power;
-        init();
-    }*/
-
     bool getPower() const;
-    /* {
-        return disp_power;
-    }*/
-
+    void setMode(bool segmode = false);
+    bool getMode() const;
     static void show(const char* s, uint8_t dots = 0);
-    /* {
-        for (int i = 0; *s && i < 4; i++, s++) 
-        {
-            // Lookup for char *s which segments to enable. *s is truncated to 7 bits
-            uint8_t segments = (dispFont[*s & 0x7F]); 
-            if (dots & (1 << i)) segments |= SEG_P; // Add dot to segments
-            disp_set(i, segments);
-        }
-    }*/
-
     IRAM_ATTR static void setDigit(uint8_t d, uint8_t segs);
-    /* {
-        // Send to display
-        Wire.beginTransmission(0x34 + d);
-        Wire.write(segs);
-        Wire.endTransmission();
-    }*/
+
 private:
     IRAM_ATTR static uint8_t write(uint8_t reg, uint8_t val);
-    /* {
-        Wire.beginTransmission(reg); 
-        Wire.write(val);
-        return Wire.endTransmission();
-    }*/
-    uint8_t disp_brightness; // 1 (min) to 8 (max)
-    bool disp_mode;         // 0 (8 segments) or 1 (7 segments)
-    bool disp_power;        // 0 (off) or 1 (on)
+    struct DispSettings
+    {
+        unsigned char power : 1;
+        unsigned char : 2;
+        unsigned char mode : 1; // 0 : 8-bit, 1 : 7-bit
+        unsigned char brightness : 3; // 1-8 : 001 (min) to (1)000 (max)
+    } settings;
+
 };
 
 #endif

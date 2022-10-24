@@ -60,14 +60,13 @@ bool sync = false;
 
 Ticker dispTick;
 bool animRunning;
-disp303 disp;
+Disp303 disp;
 
 IRAM_ATTR void dispNextFrame()
 {
     static int frame = 0;
     static const uint8_t ani[] = { SEG_A, SEG_B, SEG_C, SEG_D, SEG_E, SEG_F, 0 };
 
-    //disp_set(3, ani[frame++]);
     disp.setDigit(3, ani[frame++]);
     if (!ani[frame])
         frame = 0;
@@ -95,11 +94,7 @@ void setup() {
   Serial.printf("main: compiled " __DATE__ ", " __TIME__ "\n" );
 
   // Identify oursleves, regardless if we go into config mode or the real app
-  /*
-  disp_init();
-  disp_power_set(1);
-  disp_show("nClC");
-  */
+  
   disp.init();
   disp.setPower();
   disp.show("nClC");
@@ -116,7 +111,6 @@ void setup() {
   but_init();
 
   // Preprocess config for rendering
-  //disp_show("NtP");
   disp.show("NtP");
   dispTick.attach_ms(250, dispNextFrame);
   animRunning = true;
@@ -129,8 +123,6 @@ void setup() {
   render_dayfirst = cfg.getval("dateorder")[0]!='m';
   if( strlen(cfg.getval("monthnames"))==24 ) render_months=cfg.getval("monthnames");
   Serial.printf("rend: date %s, names '%s'\n",render_dayfirst?"day:month":"month:day",render_months);
-
-  //disp_set(3, SEG_B | SEG_G | SEG_E);
 
   // WiFi and NTP
   wifi_init(cfg.getval("Ssid.1"),cfg.getval("Password.1"), cfg.getval("Ssid.2"),cfg.getval("Password.2"), cfg.getval("Ssid.3"),cfg.getval("Password.3"));
@@ -154,12 +146,10 @@ void setup() {
               Serial.println("Start updating " + type);
           }
           sync = false;
-          //disp_show("OtA");
           disp.show("OtA");
           });
       ArduinoOTA.onEnd([]() {
           Serial.println("\nEnd");
-          //disp_show("----");
           disp.show("----");
           });
       ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
@@ -189,15 +179,13 @@ void setup() {
               if (!dots)
                   dots = dots_mask;
               dots >>= 1;
-              Serial.printf("Progress: %3u%% %d:[%s]\n", newprog, val, disp_raw);
+              Serial.printf("Progress: %3u%% %d:[%s]\n", newprog/2, val, disp_raw);
           }
-          //disp_show(disp_raw, dots&0b1101);
           disp.show(disp_raw, dots & 0b1101);
           });
 
       ArduinoOTA.onError([](ota_error_t error) {
           Serial.printf("Error[%u]: ", error);
-          //disp_show("Err");
           disp.show("Err");
           if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
           else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
@@ -253,7 +241,7 @@ void loop()
   but_scan();
 
   if (but_wentdown(BUT3)) //disp_brightness_set( disp_brightness_get()%8 + 1 );
-      disp.setBrightness(disp.getBrightness() % 8 + 1);
+      disp.setBrightness(); //disp.setBrightness(disp.getBrightness() % 8 + 1);
   if( but_wentdown(BUT2) ) show_date = !show_date;
   
   time_t      tnow= time(NULL);       // Returns seconds (and writes to the passed pointer, when not NULL) - note `time_t` is just a `long`.
@@ -309,10 +297,6 @@ void loop()
       }
       //disp_show(bnow, dots);
       disp.show(bnow, dots);
-  }
-  else // not synced yet...
-  {
-//      disp_set(3, SEG_A | SEG_G | SEG_E);
   }
   
 }
